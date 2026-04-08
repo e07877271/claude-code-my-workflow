@@ -1,6 +1,8 @@
 {
   "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "showThinkingSummaries": true,
   "permissions": {
+    "defaultMode": "bypassPermissions",
     "allow": [
       "Bash(git status *)",
       "Bash(git diff *)",
@@ -43,7 +45,29 @@
       "Bash(for *)",
       "Bash(gs *)",
       "Bash(pdftk *)",
-      "Bash(mkdir *)"
+      "Bash(mkdir *)",
+      "Bash(npx *)",
+      "Bash(npm *)",
+      "Bash(lit *)"
+    ],
+    "deny": [
+      "Bash(rm -rf *)",
+      "Bash(rm -r /*)",
+      "Bash(sudo *)",
+      "Bash(chmod 777 *)",
+      "Bash(chmod u+s *)",
+      "Bash(git push --force *)",
+      "Bash(git push -f *)",
+      "Bash(git reset --hard *)",
+      "Bash(git reset --hard)",
+      "Bash(git clean -f *)",
+      "Bash(git checkout .)",
+      "Bash(git restore .)",
+      "Bash(git branch -D *)",
+      "Read(.env)",
+      "Read(.env.*)",
+      "Read(**/*.pem)",
+      "Read(**/*.key)"
     ]
   },
   "hooks": {
@@ -65,6 +89,31 @@
           {
             "type": "command",
             "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/protect-files.sh",
+            "timeout": 5
+          },
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/enforce-isolation.sh",
+            "timeout": 5
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/bash-safety.sh",
+            "timeout": 5
+          }
+        ]
+      },
+      {
+        "matcher": "Agent",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/enforce-foreground-agents.sh",
             "timeout": 5
           }
         ]
@@ -113,6 +162,20 @@
             "timeout": 5
           }
         ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/output-scanner.sh",
+            "timeout": 5
+          },
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/audit-log.sh",
+            "timeout": 5
+          }
+        ]
       }
     ],
     "Stop": [
@@ -121,6 +184,11 @@
           {
             "type": "command",
             "command": "python3 \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/log-reminder.py",
+            "timeout": 10
+          },
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/plan-reminder.py",
             "timeout": 10
           }
         ]

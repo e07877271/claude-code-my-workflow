@@ -153,13 +153,13 @@ Most of the time, you just describe what you want and Claude handles the rest. E
 ::: {.callout-important}
 ## The Bottom Line
 
-**You talk, Claude orchestrates.** The 10 agents, 22 skills, and 18 rules exist so you don't have to think about them. Describe your goal, approve the plan, and let the system work.
+**You talk, Claude orchestrates.** The 10 agents, 28 skills, and 20 rules exist so you don't have to think about them. Describe your goal, approve the plan, and let the system work.
 :::
 
 ::: {.callout-note}
 ## You Don't Need All of This on Day One
 
-This guide describes the full system --- 10 agents, 22 skills, 18 rules. That is the ceiling, not the floor. **Start with just CLAUDE.md and 2--3 skills** (`/compile-latex`, `/proofread`, `/commit`). Add rules and agents as you discover what you need. The template is designed for progressive adoption: fork it, fill in the placeholders, and start working. Everything else is there when you're ready.
+This guide describes the full system --- 10 agents, 28 skills, 20 rules. That is the ceiling, not the floor. **Start with just CLAUDE.md and 2--3 skills** (`/compile-latex`, `/proofread`, `/commit`). Add rules and agents as you discover what you need. The template is designed for progressive adoption: fork it, fill in the placeholders, and start working. Everything else is there when you're ready.
 :::
 
 ---
@@ -653,7 +653,7 @@ argument-hint: "[filename without .tex extension]"
 ::: {.callout-note}
 ## Built-In Skills
 
-Claude Code ships with built-in skills beyond this template's 22: `/batch` orchestrates parallel refactoring across your codebase (using git worktrees for isolation), `/simplify` runs 3-agent code review and applies fixes, and `/debug` helps troubleshoot sessions. These complement the academic skills above.
+Claude Code ships with built-in skills beyond this template's 28: `/batch` orchestrates parallel refactoring across your codebase (using git worktrees for isolation), `/simplify` runs 3-agent code review and applies fixes, and `/debug` helps troubleshoot sessions. These complement the academic skills above.
 :::
 
 ## Agents --- Specialized Reviewers {#agents---specialized-reviewers}
@@ -917,6 +917,12 @@ The template includes hooks for logging, notifications, file protection, and con
 | Context restoration | `SessionStart[compact|resume]` | Restores context after compaction or resume |
 | Context monitor | `PostToolUse[Bash|Task]` | Progressive warnings at 40%/55%/65%/80%/90% context |
 | Verification reminder | `PostToolUse[Write|Edit]` | Reminds to compile/render before marking done |
+| Bash safety | `PreToolUse[Bash]` | Blocks `rm -rf`, force push, `sudo`, curl pipe to shell |
+| Output scanner | `PostToolUse` | Warns if tool output contains leaked secrets |
+| Audit log | `PostToolUse` | Append-only JSONL audit trail of all tool invocations |
+| Pipeline isolation | `PreToolUse[Edit\|Write]` | Reviewer agents can only write to `quality_reports/` |
+| Foreground agents | `PreToolUse[Agent]` | Blocks background agents that can't prompt for permissions |
+| Plan persistence | `Stop` | Blocks if plan discussed but not saved to disk |
 
 Verification and Beamer-Quarto sync are enforced via auto-loaded rules, which are the right tool for nuanced judgment. Hooks are reserved for enforcement that *must* survive context compression.
 
@@ -935,6 +941,17 @@ Verification and Beamer-Quarto sync are enforced via auto-loaded rules, which ar
 ## Hook Design Principle
 Use **command hooks** for fast, mechanical checks (file exists? counter threshold?). Use **prompt hooks** for soft guidance that doesn't need a script. Use **rules** for nuanced judgment (did Claude verify correctly?). Avoid prompt hooks that fire on high-frequency events --- the injected text adds up in context.
 :::
+
+### Security Layer {#security-layer}
+
+The template includes a defense-in-depth security layer:
+
+- **Static deny list** in `settings.json` blocks 17 dangerous patterns at the permission level
+- **`bash-safety.sh`** provides dynamic pattern matching for destructive commands (`rm -rf`, force push, `sudo`, curl pipe to shell)
+- **`output-scanner.sh`** detects leaked secrets (AWS keys, API tokens, private keys) in tool output
+- **`audit-log.sh`** maintains an append-only JSONL trail of all tool invocations
+
+Safety hooks fail CLOSED (block on error) unlike monitoring hooks which fail OPEN (allow on error). This means if a safety hook crashes, the operation is blocked --- the safe default. Monitoring hooks (like the session log reminder) allow the operation to proceed even if the hook itself fails.
 
 ### Context Survival System (Advanced) {#context-survival-system-advanced}
 
@@ -1751,6 +1768,49 @@ Claude: [Runs 7 sequential forked reviews, each blind to the others]
 
 **Adapting for other artifacts:** The same principle works for replication packages (7 passes: code, data, documentation, licensing, runtime, outputs, README) or grant proposals (significance, approach, innovation, environment, budget).
 
+### Pattern 16: Second-Opinion with Oracle {#pattern-16-oracle}
+
+For complex problems that benefit from independent verification --- structural estimation plans, theorem proofs, identification arguments --- use the Oracle skill to get a second opinion from ChatGPT Pro:
+
+```
+/oracle Is this identification argument for the LATE valid under heterogeneous treatment effects?
+```
+
+Oracle bundles your project context + prompt into a single rich query. Browser mode takes 10--60 minutes but gives access to extended thinking. Use `--render --copy` as a fallback to manually paste into ChatGPT.
+
+**When to use:** Plan reviews for complex empirical projects, proving theorems, extending models from papers.
+
+### Pattern 17: PDF Preprocessing Pipeline {#pattern-17-pdf-preprocessing}
+
+Before feeding papers to `/lit-review`, `/review-paper`, or `/oracle`, preprocess them with LiteParse:
+
+```
+/parse-paper master_supporting_docs/angrist_pischke_2009.pdf
+```
+
+Use text extraction for prose and references. Use screenshots for tables and equations (text extraction mangles math). Batch-process your entire reading list for a literature review.
+
+### Pattern 18: Autonomous Research Loops (Autoresearch) {#pattern-18-autoresearch}
+
+For Monte Carlo simulations and parameter exploration, use the Karpathy autoresearch pattern with `/simulation-study`:
+
+1. Create a `program.md` file (use `templates/research-program.md`) defining:
+   - What files the agent CAN modify (estimator implementations, parameters)
+   - What is FROZEN (data generation pipeline, evaluation metrics)
+   - A single scalar success metric (RMSE, coverage, etc.)
+2. Run `/simulation-study` to scaffold the harness
+3. Let the agent iterate: modify → run → measure → keep or revert → repeat
+
+The key insight: reduce success to a number. If you can't define "better" numerically, the autonomous loop can't help.
+
+### Pattern 19: Pipeline Isolation {#pattern-19-pipeline-isolation}
+
+Reviewer agents are read-only by design (enforced by the `enforce-isolation.sh` hook). This prevents the common failure mode where a reviewer who also fixes finds only easily fixable issues.
+
+The workflow: reviewer identifies issues → documents in report → orchestrator dispatches fixer → fixer implements fixes → reviewer re-verifies → checks for false convergence.
+
+This is the StatsClaw principle: "Critics never create. Creators never self-score."
+
 ---
 
 # The Ecosystem: What Others Have Built {#sec-ecosystem}
@@ -1768,12 +1828,13 @@ This repository provides the foundation --- the infrastructure patterns (plan-fi
 | Human judgment, AI execution | Xu & Yang | You design the diagnostic; Claude runs it |
 | Beauty is function | MixtapeTools | Every visual element earns its presence; decoration without function is noise |
 | Constraint-based autonomy | autoresearch | Define boundaries in Markdown (what CAN/CANNOT change); let Claude explore within |
+| Cross-model verification | Oracle CLI | Get a second opinion from ChatGPT Pro for proofs, identification, and strategy ([Pattern 16](#pattern-16-oracle)) |
 | Sequential independent audits | ClaudeCodeTools | Run N blind audit passes; independence prevents groupthink ([Pattern 15](#pattern-15-sequential-audits)) |
 
 ::: {.callout-tip}
 ## Which Ecosystem Project Should I Start With?
 
-If you write **papers**: start with clo-author (adversarial review pairs) or ClaudeCodeTools (seven-audit protocol, see [Pattern 15](#pattern-15-sequential-audits)). If you give **presentations**: MixtapeTools. If you run **computational experiments**: autoresearch. If you're a **non-technical academic**: claudeblattman. All of them build on the same foundation patterns from this template — the [orchestrator](#sec-system), [quality gates](#sec-quality), and [adversarial review](#the-adversarial-pattern-critic-fixer).
+If you write **papers**: start with clo-author (adversarial review pairs) or ClaudeCodeTools (seven-audit protocol, see [Pattern 15](#pattern-15-sequential-audits)). If you give **presentations**: MixtapeTools. If you run **computational experiments**: autoresearch (and see [Pattern 18](#pattern-18-autoresearch)). If you want **cross-model verification**: use `/oracle` ([Pattern 16](#pattern-16-oracle)). If you're a **non-technical academic**: claudeblattman. All of them build on the same foundation patterns from this template — the [orchestrator](#sec-system), [quality gates](#sec-quality), and [adversarial review](#the-adversarial-pattern-critic-fixer).
 :::
 
 Here is what each project does and when you should use it.
@@ -2151,7 +2212,7 @@ This is the `/learn` lifecycle in action: discover a repeating workflow → extr
 5. **Verify everything.** The verification rule exists for a reason. Never skip compilation or rendering checks.
 6. **Session logs matter.** Document design decisions, not just what changed. Future-you will thank present-you.
 7. **Devil's Advocate early.** Challenge slide structure before you've built 50 slides on a shaky foundation.
-8. **Progressive disclosure.** Start with CLAUDE.md + 2--3 rules. Add more as your workflow matures. Newcomers should not face 18 rules on day one.
+8. **Progressive disclosure.** Start with CLAUDE.md + 2--3 rules. Add more as your workflow matures. Newcomers should not face 20 rules on day one.
 9. **Use `CLAUDE.local.md` for personal overrides.** This file is automatically gitignored and loaded alongside `CLAUDE.md`. Put machine-specific paths, personal preferences, and local tool versions here --- they won't pollute the shared repo.
 
 ::: {.callout-note collapse="true"}
@@ -2209,6 +2270,12 @@ Claude Code supports **plugins** --- bundled collections of skills, agents, hook
 | `/learn` | `.claude/skills/learn/` | Extract discoveries into persistent skills |
 | `/context-status` | `.claude/skills/context-status/` | Show session health and context usage |
 | `/deep-audit` | `.claude/skills/deep-audit/` | Repository-wide consistency audit |
+| `/oracle` | `.claude/skills/oracle/` | Cross-validate with ChatGPT Pro via Oracle CLI |
+| `/parse-paper` | `.claude/skills/parse-paper/` | Extract structured content from academic PDFs |
+| `/mailbox` | `.claude/skills/mailbox/` | Structured inter-agent communication |
+| `/progress` | `.claude/skills/progress/` | Visual progress tracking |
+| `/ship` | `.claude/skills/ship/` | One-command commit-push-PR-merge |
+| `/simulation-study` | `.claude/skills/simulation-study/` | Monte Carlo simulation scaffold |
 
 ## All Rules
 
@@ -2251,6 +2318,12 @@ Claude Code supports **plugins** --- bundled collections of skills, agents, hook
 | Context restoration | SessionStart[compact\|resume] (command) | `.claude/hooks/post-compact-restore.py` |
 | Context monitor | PostToolUse[Bash\|Task] (command) | `.claude/hooks/context-monitor.py` |
 | Verification reminder | PostToolUse[Write\|Edit] (command) | `.claude/hooks/verify-reminder.py` |
+| Bash safety | PreToolUse[Bash] (command) | `.claude/hooks/bash-safety.sh` |
+| Output scanner | PostToolUse (command) | `.claude/hooks/output-scanner.sh` |
+| Audit log | PostToolUse (command) | `.claude/hooks/audit-log.sh` |
+| Pipeline isolation | PreToolUse[Edit\|Write] (command) | `.claude/hooks/enforce-isolation.sh` |
+| Foreground agents | PreToolUse[Agent] (command) | `.claude/hooks/foreground-agents.sh` |
+| Plan persistence | Stop (command) | `.claude/hooks/plan-persistence.sh` |
 
 **Additional hook events** available in Claude Code (not used in this template but available for custom hooks):
 
