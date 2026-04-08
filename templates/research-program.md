@@ -53,7 +53,7 @@ If multiple criteria conflict, use this priority: [primary > secondary > tertiar
 | # | Branch/Commit | Change Description | Primary Metric | Secondary | Status |
 |---|--------------|-------------------|----------------|-----------|--------|
 | 0 | baseline | Initial implementation | [value] | [value] | DONE |
-| 1 | | | | | |
+| 1 | -- | -- | -- | -- | -- |
 
 ## Output Format
 

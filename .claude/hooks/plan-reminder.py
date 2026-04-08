@@ -78,7 +78,9 @@ def find_plan_file_after(project_dir: str, after_ts: str | None) -> bool:
 
     if after_ts:
         try:
-            cutoff = datetime.fromisoformat(after_ts)
+            # Normalize Z suffix to +00:00 for Python < 3.11 compatibility
+            normalized = after_ts.replace("Z", "+00:00") if after_ts.endswith("Z") else after_ts
+            cutoff = datetime.fromisoformat(normalized).replace(tzinfo=None)
         except (ValueError, TypeError):
             cutoff = None
     else:

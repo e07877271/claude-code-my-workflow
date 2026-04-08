@@ -57,6 +57,8 @@
     "deny": [
       "Bash(rm -rf *)",
       "Bash(rm -r /*)",
+      "Bash(rm -r ~)",
+      "Bash(rm -r /)",
       "Bash(sudo *)",
       "Bash(chmod 777 *)",
       "Bash(chmod u+s *)",

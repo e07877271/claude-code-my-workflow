@@ -13,9 +13,18 @@
 # Fail CLOSED: if anything unexpected goes wrong, block the command.
 trap 'echo "BLOCKED by bash-safety hook: unexpected error in safety check" >&2; exit 2' ERR
 
+# Require jq for JSON parsing — fail closed if missing
+if ! command -v jq >/dev/null 2>&1; then
+    echo "BLOCKED by bash-safety hook: jq is required for safety checks." >&2
+    exit 2
+fi
+
 INPUT=$(cat)
 
-TOOL_NAME=$(echo "$INPUT" | jq -r '.tool_name // empty' 2>/dev/null) || TOOL_NAME=""
+if ! TOOL_NAME=$(echo "$INPUT" | jq -er '.tool_name' 2>/dev/null); then
+    echo "BLOCKED by bash-safety hook: Failed to parse tool_name." >&2
+    exit 2
+fi
 if [[ "$TOOL_NAME" != "Bash" ]]; then
     exit 0
 fi
@@ -33,8 +42,12 @@ block() {
 }
 
 # 1. DESTRUCTIVE FILESYSTEM OPERATIONS
+# Block rm -rf AND rm -r targeting dangerous roots (/ ~ $HOME . .. *)
 if echo "$NORM_CMD" | grep -qiE 'rm\s+(-[a-z]*r[a-z]*f|-[a-z]*f[a-z]*r)\s+(/|/\*|~|\$HOME|\.\.|\.|\*)'; then
     block "Recursive force-delete targeting dangerous path. Use targeted 'rm' on specific files instead."
+fi
+if echo "$NORM_CMD" | grep -qiE 'rm\s+(-[a-z]*r|-[a-z]*R|--recursive)\s+(/|/\*|~|\$HOME|\.\.)'; then
+    block "Recursive delete targeting dangerous root. Use targeted 'rm' on specific files instead."
 fi
 
 # 2. DESTRUCTIVE GIT OPERATIONS
