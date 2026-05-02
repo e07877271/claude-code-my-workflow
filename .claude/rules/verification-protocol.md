@@ -1,53 +1,40 @@
 ---
 paths:
-  - "Slides/**/*.tex"
-  - "Quarto/**/*.qmd"
-  - "docs/**"
+  - "reports/**"
+  - "topics/**"
 ---
 
-# Task Completion Verification Protocol
+# 任务完成验证协议
 
-**At the end of EVERY task, Claude MUST verify the output works correctly.** This is non-negotiable.
+**每次生成或修改报告后，必须在汇报前完成以下验证。**
 
-## For Quarto/HTML Slides:
-1. Run `./scripts/sync_to_docs.sh` (or `./scripts/sync_to_docs.sh LectureN`) to render and deploy
-2. Open the HTML in browser: `open docs/slides/LectureX.html` (macOS) or `xdg-open` (Linux)
-3. Verify images display by reading 2-3 image files to confirm valid content
-4. Check HTML source for correct image paths
-5. Check for overflow by scanning dense slides
-6. Verify environment parity: every Beamer box environment has a CSS equivalent in the QMD
-7. Report verification results
+## 对于报告文件（reports/*.md）
 
-## For LaTeX/Beamer Slides:
-1. Compile with xelatex and check for errors
-2. Open the PDF to verify figures render (`open` on macOS, `xdg-open` on Linux)
-3. Check for overfull hbox warnings
+1. 确认文件已写入磁盘（PowerShell）：
+   ```powershell
+   Test-Path "reports/YYYY-MM-DD_[主题简称].md"
+   ```
+2. 读取文件前 30 行，确认开篇摘要和第一节标题已正确生成
+3. 检查文件字数是否符合预期（2000 字以上）
+4. 若已运行 `/review-report`，确认审查报告已保存至 `quality_reports/`
 
-## For TikZ Diagrams in HTML/Quarto:
-1. Browsers **cannot** display PDF images inline — ALWAYS convert to SVG
-2. Use SVG (vector format) for crisp rendering: `pdf2svg input.pdf output.svg`
-3. **NEVER use PNG for diagrams** — PNG is raster and looks blurry
-4. Verify SVG files contain valid XML/SVG markup
-5. Copy SVGs to `docs/Figures/LectureX/` via `sync_to_docs.sh`
-6. **Freshness check:** Before using any TikZ SVG, verify extract_tikz.tex matches current Beamer source
+## 对于桌面 Markdown 文件（C:\Users\e0787\Desktop\*.md）
 
-## For R Scripts:
-1. Run `Rscript scripts/R/filename.R`
-2. Verify output files (PDF, RDS) were created with non-zero size
-3. Spot-check estimates for reasonable magnitude
+1. 确认文件存在（PowerShell）：
+   ```powershell
+   Test-Path "C:\Users\e0787\Desktop\YYYY-MM-DD_[主题简称].md"
+   ```
+2. 若文件不存在，重新运行：
+   ```powershell
+   Copy-Item "reports/YYYY-MM-DD_[主题简称].md" -Destination "C:\Users\e0787\Desktop\YYYY-MM-DD_[主题简称].md" -Force
+   ```
 
-## Common Pitfalls:
-- **PDF images in HTML**: Browsers don't render PDFs inline → convert to SVG
-- **Relative paths**: `../Figures/` works from `Quarto/` but not from `docs/slides/` → use `sync_to_docs.sh`
-- **Assuming success**: Always verify output files exist AND contain correct content
-- **Stale TikZ SVGs**: extract_tikz.tex diverges from Beamer source → always diff-check
+## 对于资料摘要（topics/*.md）
 
-## Verification Checklist:
-```
-[ ] Output file created successfully
-[ ] No compilation/render errors
-[ ] Images/figures display correctly
-[ ] Paths resolve in deployment location (docs/)
-[ ] Opened in browser/viewer to confirm visual appearance
-[ ] Reported results to user
-```
+1. 确认文件已写入 `topics/` 目录
+2. 确认每条来源都有机构名称、日期和核心论点
+
+## 禁止假设成功
+
+- 不要在未验证文件存在的情况下汇报"已完成"
+- 若验证失败，报告失败原因并重试，而不是忽略错误
